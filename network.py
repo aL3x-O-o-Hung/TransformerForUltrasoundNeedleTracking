@@ -143,7 +143,7 @@ class MHSA(nn.Module):
 
     def forward(self,x):
         m_batchsize,C,width,height=x.size()
-        x=self.pe*x
+        x=self.pe+x
         proj_query=self.query_conv(x).view(m_batchsize,-1,width*height).permute(0,2,1)  # B X (WH) X C
         proj_key=self.key_conv(x).view(m_batchsize,-1,width*height)  # B X C X (WH)
         energy=torch.bmm(proj_query,proj_key)
@@ -180,8 +180,8 @@ class MHCA(nn.Module):
 
     def forward(self,x,b):
         batch_size=x.size(0)
-        x=self.pe1*x
-        b=self.pe2*b
+        x=self.pe1+x
+        b=self.pe2+b
         q=self.query_conv(x).view(batch_size,-1,self.w1*self.h1).permute(0,2,1)
         k=self.key_conv(x).view(batch_size,-1,self.w1*self.h1)
         v=self.value_conv(b).view(batch_size,-1,self.w2*self.h2)
