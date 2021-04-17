@@ -35,6 +35,8 @@ class NeedleImagePairDataset(Dataset):
         for folder in self.folders:
             file_name = os.listdir(os.path.join(self.root, folder, 'train_images'))
             file_name.sort(key=lambda x:x[:-4])
+            self.image_pairs.append([os.path.join(folder, 'train_images', file_name[0])])
+            self.label_pairs.append([os.path.join(folder, 'train_labels', file_name[0])])
             for f in range(len(file_name) - 1):
                 self.image_pairs.append([os.path.join(folder, 'train_images', file_name[f]), os.path.join(folder, 'train_images', file_name[f + 1])])
                 self.label_pairs.append([os.path.join(folder, 'train_labels', file_name[f]), os.path.join(folder, 'train_labels', file_name[f + 1])])
@@ -53,27 +55,46 @@ class NeedleImagePairDataset(Dataset):
 
     def __getitem__(self, idx):
         image_pair = self.image_pairs[idx]
-        cur_image_name = image_pair[0]
-        next_image_name = image_pair[1]
 
-        label_pair = self.label_pairs[idx]
-        cur_label_name = label_pair[0]
-        next_label_name = label_pair[1]
-        # load image
-        cur_image = Image.open(os.path.join(self.root, cur_image_name))
-        cur_image = transforms.Compose(self.transform)(cur_image)
-        # print(os.path.join(self.root, next_image_name))
-        next_image = Image.open(os.path.join(self.root, next_image_name))
-        next_image = transforms.Compose(self.transform)(next_image) 
-        # load label
-        cur_image_label = Image.open(os.path.join(self.root, cur_label_name))
-        cur_image_label = transforms.Compose(self.transform)(cur_image_label)
-        next_image_label = Image.open(os.path.join(self.root, next_label_name))
-        next_image_label = transforms.Compose(self.transform)(next_image_label)       
+        if len(image_pair) == 2:
+            cur_image_name = image_pair[0]
+            next_image_name = image_pair[1]
 
-        # convert to segmentation map 
-        cur_image_label = cur_image_label[0, :, :]
-        next_image_label = next_image_label[0, :, :]
+            label_pair = self.label_pairs[idx]
+            cur_label_name = label_pair[0]
+            next_label_name = label_pair[1]
+            # load image
+            cur_image = Image.open(os.path.join(self.root, cur_image_name))
+            cur_image = transforms.Compose(self.transform)(cur_image)
+            # print(os.path.join(self.root, next_image_name))
+            next_image = Image.open(os.path.join(self.root, next_image_name))
+            next_image = transforms.Compose(self.transform)(next_image) 
+            # load label
+            cur_image_label = Image.open(os.path.join(self.root, cur_label_name))
+            cur_image_label = transforms.Compose(self.transform)(cur_image_label)
+            next_image_label = Image.open(os.path.join(self.root, next_label_name))
+            next_image_label = transforms.Compose(self.transform)(next_image_label)       
+
+            # convert to segmentation map 
+            cur_image_label = cur_image_label[0, :, :]
+            next_image_label = next_image_label[0, :, :]
+        else:
+            next_image_name = image_pair[0]
+            label_pair = self.label_pairs[idx]
+            next_label_name = label_pair[0]
+            # load image
+            next_image = Image.open(os.path.join(self.root, next_image_name))
+            next_image = transforms.Compose(self.transform)(next_image) 
+            # load label
+            next_image_label = Image.open(os.path.join(self.root, next_label_name))
+            next_image_label = transforms.Compose(self.transform)(next_image_label)       
+
+            # convert to segmentation map 
+            next_image_label = next_image_label[0, :, :]
+
+            # all empty
+            cur_image = torch.zeros(next_image.size())
+            cur_image_label = torch.zeros(next_image_label.size())           
 
         return {'current_image':cur_image.float(), 'current_image_label':cur_image_label.long(), 'next_image':next_image.float(), 'next_image_label':next_image_label.long()}
 
