@@ -29,7 +29,7 @@ def train(epochs,current_epoch,path):
     params=list(unet.parameters())+list(transformer.parameters())
     criterion=torch.nn.BCELoss()
     optimizer=torch.optim.SGD(params,lr=0.01)
-    dataloader=NeedleImagePairDataset(split='train',root='../needle_insertion_dataset')
+    dataloader=NeedleImagePairDataset(split='train',root='../data/needle_insertion_dataset')
     for epoch in range(current_epoch+1,epochs):
         for batch,data in enumerate(dataloader):
             previous_frame=data['current_image'].to(device)
