@@ -17,6 +17,7 @@ class ConvBlock(nn.Module):
     """ConvBlock for UNet"""
     def __init__(self,input_channels,output_channels,max_pool):
         super(ConvBlock,self).__init__()
+        self.max_pool=max_pool
         self.conv=[]
         self.conv.append(nn.Conv2d(in_channels=input_channels,out_channels=output_channels,kernel_size=3,stride=1,padding=1))
         self.conv.append(nn.BatchNorm2d(output_channels,eps=1e-05,momentum=0.1,affine=True,track_running_stats=True))
@@ -25,12 +26,15 @@ class ConvBlock(nn.Module):
         self.conv.append(nn.BatchNorm2d(output_channels,eps=1e-05,momentum=0.1,affine=True,track_running_stats=True))
         self.conv.append(nn.ReLU())
         if max_pool:
-            self.conv.append(nn.MaxPool2d(3,stride=2,dilation=(1,1),ceil_mode=False))
+            self.pool=nn.MaxPool2d(2,stride=2,dilation=(1,1))
         self.conv=nn.Sequential(*self.conv)
 
     def forward(self,x):
         x=self.conv(x)
-        return x
+        b=x
+        if self.max_pool:
+            x=self.pool(x)
+        return x,b
 
 class DeconvBlock(nn.Module):
     """DeconvBlock for UNet"""
@@ -45,7 +49,7 @@ class DeconvBlock(nn.Module):
     def forward(self,x,b):
         x=self.upconv(x)
         x=torch.cat((x,b),dim=1)
-        x=self.conv(x)
+        x,_=self.conv(x)
         return x
 
 
@@ -68,8 +72,8 @@ class Encoder(nn.Module):
     def forward(self,x):
         b=[]
         for i in range(self.num_layers):
-            x=self.conv[i](x)
-            b.append(x)
+            x,block=self.conv[i](x)
+            b.append(block)
         b=b[:-1]
         b=b[::-1]
         return x,b
@@ -116,7 +120,9 @@ def PositionalEncoding2d(d_model,height,width):
     if d_model%4!=0:
         raise ValueError("Cannot use sin/cos positional encoding with "
                          "odd dimension (got dim={:d})".format(d_model))
-    pe = torch.zeros(d_model,height,width)
+    height=int(height)
+    width=int(width)
+    pe = torch.zeros((d_model,height,width)).to(device)
     # Each dimension use half of d_model
     d_model=int(d_model/2)
     div_term=torch.exp(torch.arange(0.,d_model,2)*(-(math.log(10000.0)/d_model)))
@@ -126,7 +132,7 @@ def PositionalEncoding2d(d_model,height,width):
     pe[1:d_model:2,:,:]=torch.cos(pos_w*div_term).transpose(0,1).unsqueeze(1).repeat(1,height,1)
     pe[d_model::2,:,:]=torch.sin(pos_h * div_term).transpose(0,1).unsqueeze(2).repeat(1,1,width)
     pe[d_model+1::2,:,:] = torch.cos(pos_h*div_term).transpose(0,1).unsqueeze(2).repeat(1,1,width)
-    pe=torch.reshape(pe,(1,d_model,height,width))
+    pe=torch.reshape(pe,(1,d_model*2,height,width))
     return pe
 
 class MHSA(nn.Module):
@@ -166,9 +172,25 @@ class MHCA(nn.Module):
         self.w2=w2
         self.pe1=PositionalEncoding2d(d1,h1,w1)
         self.pe2=PositionalEncoding2d(d2,h2,w2)
-        self.query_conv=nn.Conv2d(in_channels=d2,out_channels=d2,kernel_size=1)
-        self.key_conv=nn.Conv2d(in_channels=d2,out_channels=d2,kernel_size=1)
-        self.value_conv=nn.Conv2d(in_channels=d1,out_channels=d1,kernel_size=1)
+        self.query_conv=[]
+        self.key_conv=[]
+        self.value_conv=[]
+        self.query_conv.append(nn.Conv2d(in_channels=d1,out_channels=d1,kernel_size=1))
+        self.query_conv.append(nn.BatchNorm2d(d1,eps=1e-05,momentum=0.1,affine=True,track_running_stats=True))
+        self.query_conv.append(nn.ReLU())
+        self.query_conv=nn.Sequential(*self.query_conv)
+        self.key_conv.append(nn.Conv2d(in_channels=d1,out_channels=d1,kernel_size=1))
+        self.key_conv.append(nn.BatchNorm2d(d1,eps=1e-05,momentum=0.1,affine=True,track_running_stats=True))
+        self.key_conv.append(nn.ReLU())
+        self.key_conv=nn.Sequential(*self.key_conv)
+        self.value_conv.append(nn.Conv2d(in_channels=d2,out_channels=d2,kernel_size=1))
+        self.value_conv.append(nn.BatchNorm2d(d2,eps=1e-05,momentum=0.1,affine=True,track_running_stats=True))
+        self.value_conv.append(nn.ReLU())
+
+        # to be fixed
+        self.value_conv.append(nn.MaxPool2d(2,stride=2,dilation=(1,1)))
+
+        self.value_conv=nn.Sequential(*self.value_conv)
         self.gamma=nn.Parameter(torch.zeros(1))
         self.softmax=nn.Softmax(dim=-1)
         self.conv=[]
@@ -180,16 +202,22 @@ class MHCA(nn.Module):
 
     def forward(self,x,b):
         batch_size=x.size(0)
+        #print(x.size(),b.size(),self.pe1.size(),self.pe2.size())
         x=self.pe1+x
         b=self.pe2+b
+        #print(x.size(),b.size())
         q=self.query_conv(x).view(batch_size,-1,self.w1*self.h1).permute(0,2,1)
         k=self.key_conv(x).view(batch_size,-1,self.w1*self.h1)
-        v=self.value_conv(b).view(batch_size,-1,self.w2*self.h2)
+        #v=self.value_conv(b).view(batch_size,-1,self.w2*self.h2)
+        v=self.value_conv(b).view(batch_size,-1,self.w1*self.h1).permute(0,2,1)
+        print(q.size(),k.size(),v.size())
         energy=torch.bmm(q,k)
         attention=self.softmax(energy)
-        out=torch.bmm(v,attention.permute(0,2,1))
+        #print(v.size(),attention.size(),energy.size())
+        out=torch.bmm(attention,v)
         out=out.view(batch_size,self.d2,self.h1,self.w1)
-        out=self.gamma*out+x
+        #print(out.size(),x.size())
+        #out=self.gamma*out+b
         out=self.conv(out)
         out=out*b
         return out,attention
@@ -203,15 +231,16 @@ class DeconvBlockTransformer(nn.Module):
         self.MHCA=MHCA(d1,h1,w1,d2,h2,w2)
         self.upconv.append(nn.UpsamplingBilinear2d(scale_factor=2))
         self.upconv.append(nn.Conv2d(in_channels=d1,out_channels=d2,kernel_size=3,stride=1,padding=1))
-        self.conv=ConvBlock(d2*2,d1,False)
+        self.upconv.append(nn.ReLU())
+        self.conv=ConvBlock(d2*2,d2,False)
         self.upconv=nn.Sequential(*self.upconv)
 
     def forward(self,x,b):
         b,attention=self.MHCA(x,b)
         x=self.upconv(x)
         x=torch.cat((x,b),dim=1)
-        x=self.conv(x)
-        return x
+        x,_=self.conv(x)
+        return x,attention
 
 
 class DecoderTransformer(nn.Module):
@@ -220,7 +249,7 @@ class DecoderTransformer(nn.Module):
         super(DecoderTransformer,self).__init__()
         self.conv=[]
         self.num_layers=num_layers
-        self.MHSA=MHSA(base_num**num_layers,h,w)
+        self.MHSA=MHSA(base_num*(2**num_layers),h,w)
         k=0
         for i in range(num_layers-1,0,-1):
             kk=k+1
@@ -244,11 +273,11 @@ class UNetTransformer(nn.Module):
     """UNet transformer"""
     def __init__(self,input_channels,num_classes,num_layers,input_h,input_w):
         super(UNetTransformer,self).__init__()
-        self.h=input_h/(2**(num_layers-1))
-        self.w=input_w/(2**(num_layers-1))
+        self.h=int(input_h/(2**(num_layers-1)))
+        self.w=int(input_w/(2**(num_layers-1)))
         self.encoder=Encoder(input_channels,num_layers)
         self.decoder=DecoderTransformer(num_classes,num_layers,self.h,self.w)
-        self.MHSA=MHSA(base_num*(2**num_layers(num_layers-1)),self.h,self.w)
+        self.MHSA=MHSA(base_num*(2**(num_layers-1)),self.h,self.w)
     def forward(self,x):
         attention=[]
         x,b=self.encoder(x)

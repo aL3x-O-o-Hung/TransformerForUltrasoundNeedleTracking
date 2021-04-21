@@ -42,8 +42,8 @@ class NeedleImagePairDataset(Dataset):
                 self.label_pairs.append([os.path.join(folder, 'train_labels', file_name[f]), os.path.join(folder, 'train_labels', file_name[f + 1])])
 
         if transform == None or label_transform == None:
-            self.transform = [transforms.ToTensor()]
-            self.label_transform = [transforms.ToTensor()]
+            self.transform = [transforms.Resize((256,256)),transforms.ToTensor()]
+            self.label_transform = [transforms.Resize((256,256)),transforms.ToTensor()]
         else:
             self.transform = transform
             self.label_transform = label_transform
@@ -75,7 +75,9 @@ class NeedleImagePairDataset(Dataset):
             next_image_label = Image.open(os.path.join(self.root, next_label_name))
             next_image_label = transforms.Compose(self.transform)(next_image_label)       
 
-            # convert to segmentation map 
+            # convert to segmentation map
+            cur_image=cur_image[0:1,:,:]
+            next_image=next_image[0:1,:,:]
             cur_image_label = cur_image_label[0, :, :]
             next_image_label = next_image_label[0, :, :]
         else:
@@ -91,12 +93,12 @@ class NeedleImagePairDataset(Dataset):
 
             # convert to segmentation map 
             next_image_label = next_image_label[0, :, :]
-
+            next_image=next_image[0:1,:,:]
             # all empty
             cur_image = torch.zeros(next_image.size())
             cur_image_label = torch.zeros(next_image_label.size())           
 
-        return {'current_image':cur_image.float(), 'current_image_label':cur_image_label.long(), 'next_image':next_image.float(), 'next_image_label':next_image_label.long()}
+        return {'current_image':cur_image.float(), 'current_image_label':torch.unsqueeze(cur_image_label.long(),0), 'next_image':next_image.float(), 'next_image_label':torch.unsqueeze(next_image_label.long(),0)}
 
 
 ### load single image
@@ -124,8 +126,8 @@ class NeedleImageDataset(Dataset):
                 self.label_files.append(os.path.join(folder, 'train_labels', file_name[f]))
 
         if transform == None or label_transform == None:
-            self.transform = [transforms.ToTensor()]
-            self.label_transform = [transforms.ToTensor()]
+            self.transform = [transforms.ToTensor(),transforms.Resize(256,256)]
+            self.label_transform = [transforms.ToTensor(),transforms.Resize(256,256)]
         else:
             self.transform = transform
             self.label_transform = label_transform
