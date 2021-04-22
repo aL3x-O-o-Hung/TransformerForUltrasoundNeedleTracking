@@ -14,7 +14,7 @@ from needle_image_dataset import *
 
 def model_init(num_layers=6,input_h=256,input_w=256):
     unet=UNet(2,1,num_layers)
-    transformer=UNetTransformer(3,1,num_layers,input_h,input_w)
+    transformer=UNetTransformer(3,1,num_layers,input_h,input_w,['attention','attention','attention','attention','attention','attention'])
     return unet,transformer
 
 def train(epochs,current_epoch,path):
@@ -30,7 +30,7 @@ def train(epochs,current_epoch,path):
     criterion=torch.nn.BCELoss()
     optimizer=torch.optim.SGD(params,lr=0.01)
     dataloader=NeedleImagePairDataset(split='train',root='../data/needle_insertion_dataset')
-    loader=torch.utils.data.DataLoader(dataloader,batch_size=16,shuffle=True,num_workers=4,pin_memory=True,sampler=None,drop_last=True)
+    loader=torch.utils.data.DataLoader(dataloader,batch_size=8,shuffle=True,num_workers=4,pin_memory=True,sampler=None,drop_last=True)
     for epoch in range(current_epoch+1,epochs):
         for batch,data in enumerate(loader):
             previous_frame=data['current_image'].to(device)
@@ -41,7 +41,7 @@ def train(epochs,current_epoch,path):
             x1=torch.cat((previous_frame,previous_frame),dim=1)
             confidence=unet(x1)
             x2=torch.cat((current_frame,previous_seg,confidence),dim=1)
-            pred=transformer(x2)
+            pred,_=transformer(x2)
             loss=criterion(pred,current_seg)
             print('epoch',epoch,'batch',batch,loss.item())
             loss.backward()
