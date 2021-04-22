@@ -144,7 +144,7 @@ class MHSA(nn.Module):
         self.query_conv=nn.Conv2d(in_channels=in_dim,out_channels=in_dim,kernel_size=1)
         self.key_conv=nn.Conv2d(in_channels=in_dim,out_channels=in_dim,kernel_size=1)
         self.value_conv=nn.Conv2d(in_channels=in_dim,out_channels=in_dim,kernel_size=1)
-        self.gamma=nn.Parameter(torch.zeros(1))
+        #self.gamma=nn.Parameter(torch.zeros(1))
         self.softmax=nn.Softmax(dim=-1)
 
     def forward(self,x):
@@ -157,7 +157,7 @@ class MHSA(nn.Module):
         proj_value=self.value_conv(x).view(m_batchsize,-1,width*height)  # B X C X (WH)
         out=torch.bmm(proj_value,attention.permute(0,2,1))
         out=out.view(m_batchsize,C,height,width)
-        out=self.gamma*out+x
+        #out=self.gamma*out+x
         return out,attention
 
 class MHCA(nn.Module):
@@ -191,7 +191,7 @@ class MHCA(nn.Module):
         #self.value_conv.append(nn.MaxPool2d(2,stride=2,dilation=(1,1)))
 
         self.value_conv=nn.Sequential(*self.value_conv)
-        self.gamma=nn.Parameter(torch.zeros(1))
+        #self.gamma=nn.Parameter(torch.zeros(1))
         self.softmax=nn.Softmax(dim=-1)
         self.conv=[]
         self.conv.append(nn.Conv2d(in_channels=d2,out_channels=d2,kernel_size=1))
