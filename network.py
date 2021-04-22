@@ -183,12 +183,12 @@ class MHCA(nn.Module):
         self.key_conv.append(nn.BatchNorm2d(d1,eps=1e-05,momentum=0.1,affine=True,track_running_stats=True))
         self.key_conv.append(nn.ReLU())
         self.key_conv=nn.Sequential(*self.key_conv)
-        self.value_conv.append(nn.Conv2d(in_channels=d2,out_channels=d2,kernel_size=1))
+        self.value_conv.append(nn.Conv2d(in_channels=d2,out_channels=d2,kernel_size=1,stride=2))
         self.value_conv.append(nn.BatchNorm2d(d2,eps=1e-05,momentum=0.1,affine=True,track_running_stats=True))
         self.value_conv.append(nn.ReLU())
 
         # to be fixed
-        self.value_conv.append(nn.MaxPool2d(2,stride=2,dilation=(1,1)))
+        #self.value_conv.append(nn.MaxPool2d(2,stride=2,dilation=(1,1)))
 
         self.value_conv=nn.Sequential(*self.value_conv)
         self.gamma=nn.Parameter(torch.zeros(1))
