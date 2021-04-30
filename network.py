@@ -11,7 +11,7 @@ import numpy as np
 from torchvision.ops import roi_pool,roi_align
 
 device='cuda'
-base_num=32
+base_num=64
 
 class ConvBlock(nn.Module):
     """ConvBlock for UNet"""
@@ -104,7 +104,7 @@ class UNet(nn.Module):
     def forward(self,x):
         x,b=self.encoder(x)
         x=self.decoder(x,b)
-        x=F.sigmoid(x)
+        x=torch.sigmoid(x)
         return x
 
 def PositionalEncoding2d(d_model,height,width):
@@ -240,9 +240,9 @@ class SelfAxialAttention(nn.Module):
     def forward(self,x):
         m_batchsize,C,height,width=x.size()
         if self.channel=='h':
-            x=x.permute(0,3,1,2).view(-1,C,height).unsqeeze(-1)
+            x=x.permute(0,3,1,2).contiguous().view(-1,C,height,1)
         elif self.channel=='w':
-            x=x.permute(0,2,1,3).view(-1,C,width).unsqueeze(-2)
+            x=x.permute(0,2,1,3).contiguous().view(-1,C,1,width)
         x=x+self.pe
         m_batchsize_,C_,height_,width_=x.size()
         proj_query=self.query_conv(x).view(m_batchsize_,-1,width_*height_).permute(0,2,1)  # B X (WH) X C
@@ -281,9 +281,9 @@ class CrossAxialAttention(nn.Module):
         self.h2=h2//2
         self.w2=w2//2
         self.pe1_h=PositionalEncoding2d(d1,h1,1)
-        self.pe2_h=PositionalEncoding2d(d2,h2,1)
+        self.pe2_h=PositionalEncoding2d(d2,self.h2,1)
         self.pe1_w=PositionalEncoding2d(d1,1,h1)
-        self.pe2_w=PositionalEncoding2d(d2,1,h2)
+        self.pe2_w=PositionalEncoding2d(d2,1,self.h2)
         self.query_conv_h=nn.Conv2d(in_channels=d1,out_channels=d1,kernel_size=1,bias=False)
         self.key_conv_h=nn.Conv2d(in_channels=d1,out_channels=d1,kernel_size=1,bias=False)
         self.value_conv_h=nn.Conv2d(in_channels=d2,out_channels=d2,kernel_size=1,bias=False)
@@ -305,34 +305,34 @@ class CrossAxialAttention(nn.Module):
         b_=self.pool(b)
         batch_size1,C1,height1,width1=x.size()
         batch_size2,C2,height2,width2=b_.size()
-        x=x.permute(0,3,1,2).view(-1,C1,height1).unsqeeze(-1)
-        b_=b_.permute(0,3,1,2).view(-1,C2,height2).unsqeeze(-1)
+        x=x.permute(0,3,1,2).contiguous().view(-1,C1,height1,1)
+        b_=b_.permute(0,3,1,2).contiguous().view(-1,C2,height2,1)
         x=self.pe1_h+x
         b_=self.pe2_h+b_
         batch_size1_,C1_,height1_,width1_=x.size()
         batch_size2_,C2_,height2_,width2_=b_.size()
         q=self.query_conv_h(x).view(batch_size1_,-1,height1_*width1_).permute(0,2,1)
         k=self.key_conv_h(x).view(batch_size1_,-1,height1_*width1_)
-        v=self.value_conv_h(b).view(batch_size1_,-1,height1_*width1_).permute(0,2,1)
+        v=self.value_conv_h(b_).view(batch_size1_,-1,height1_*width1_).permute(0,2,1)
         energy=torch.bmm(q,k)
-        attention=self.softmax(energy)
+        attention=self.softmax_h(energy)
         attentions.append(attention)
         out=torch.bmm(attention,v)
         out=out.view(batch_size1_,C2_,height1_,width1_)
         out=out.squeeze().view(batch_size1,width1,C2,height1).permute(0,2,3,1)
         x=x.squeeze().view(batch_size1,width1,C1,height1).permute(0,2,3,1)
         b_=out
-        x=x.permute(0,2,1,3).view(-1,C1,width1).unsqueeze(-2)
-        b_=b_.permute(0,2,1,3).view(-1,C2,width2).unsqueeze(-2)
+        x=x.permute(0,2,1,3).contiguous().view(-1,C1,1,width1)
+        b_=b_.permute(0,2,1,3).contiguous().view(-1,C2,1,width2)
         x=self.pe1_w+x
         b_=self.pe2_w+b_
         batch_size1_,C1_,height1_,width1_=x.size()
         batch_size2_,C2_,height2_,width2_=b_.size()
         q=self.query_conv_w(x).view(batch_size1_,-1,height1_*width1_).permute(0,2,1)
         k=self.key_conv_w(x).view(batch_size1_,-1,height1_*width1_)
-        v=self.value_conv_w(b).view(batch_size1_,-1,height1_*width1_).permute(0,2,1)
+        v=self.value_conv_w(b_).view(batch_size1_,-1,height1_*width1_).permute(0,2,1)
         energy=torch.bmm(q,k)
-        attention=self.softmax(energy)
+        attention=self.softmax_w(energy)
         attentions.append(attentions)
         out=torch.bmm(attention,v)
         out=out.view(batch_size1_,C2_,height1_,width1_)
@@ -425,5 +425,5 @@ class UNetTransformer(nn.Module):
         attention+=temp_attention
         x,temp_attention=self.decoder(x,b)
         attention=attention+temp_attention
-        x=F.sigmoid(x)
+        x=torch.sigmoid(x)
         return x,attention
