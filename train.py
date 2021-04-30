@@ -58,9 +58,29 @@ def train_confidence_transformer_axial(epochs,current_epoch,path='model_confiden
             print('epoch',epoch,'batch',batch,loss.item())
             loss.backward()
             optimizer.step()
-        validation(unet,transformer,loader_,criterion,'conf')
+        #validation(unet,transformer,loader_,criterion,'conf')
+        unet.eval()
+        transformer.eval()
+        total_loss=0
+        total_dice=0
+        for batch_num,data in enumerate(loader_):
+            previous_frame=data['current_image'].to(device)
+            previous_seg=data['current_image_label'].to(device)
+            current_frame=data['next_image'].to(device)
+            current_seg=data['next_image_label'].to(device)
+            if batch_num!=0:
+                previous_seg=pred
+            x1=torch.cat((previous_frame,previous_seg),dim=1)
+            confidence=unet(x1)
+            x2=torch.cat((current_frame,previous_seg,confidence),dim=1)
 
-        torch.save(unet,path+'unet'+str(epoch)+'pt')
+            pred,_=transformer(x2)
+            loss=criterion(pred,current_seg)
+            total_loss+=loss.item()
+            total_dice+=dice_coeff(pred,current_seg).item()
+        print('validation loss:',total_loss/len(loader_),'validation dice:',total_dice/len(loader_))
+
+        torch.save(unet,path+'unet'+str(epoch)+'.pt')
         torch.save(transformer,path+'transformer'+str(epoch)+'.pt')
 
 
@@ -98,8 +118,28 @@ def train_confidence_transformer_attention(epochs,current_epoch,path='model_conf
             loss.backward()
             optimizer.step()
 
-        validation(unet,transformer,loader_,criterion,'conf')
-        torch.save(unet,path+'unet'+str(epoch)+'pt')
+        #validation(unet,transformer,loader_,criterion,'conf')
+        unet.eval()
+        transformer.eval()
+        total_loss=0
+        total_dice=0
+        for batch_num,data in enumerate(loader_):
+            previous_frame=data['current_image'].to(device)
+            previous_seg=data['current_image_label'].to(device)
+            current_frame=data['next_image'].to(device)
+            current_seg=data['next_image_label'].to(device)
+            if batch_num!=0:
+                previous_seg=pred
+            x1=torch.cat((previous_frame,previous_seg),dim=1)
+            confidence=unet(x1)
+            x2=torch.cat((current_frame,previous_seg,confidence),dim=1)
+
+            pred,_=transformer(x2)
+            loss=criterion(pred,current_seg)
+            total_loss+=loss.item()
+            total_dice+=dice_coeff(pred,current_seg).item()
+        print('validation loss:',total_loss/len(loader_),'validation dice:',total_dice/len(loader_))
+        torch.save(unet,path+'unet'+str(epoch)+'.pt')
         torch.save(transformer,path+'transformer'+str(epoch)+'pt')
 
 
@@ -131,7 +171,8 @@ def train_transformer_axial_seg(epochs,current_epoch,path='model_transformer_axi
             loss.backward()
             optimizer.step()
 
-        validation(None,transformer,loader_,criterion,'seg')
+        l,d=validation(None,transformer,loader_,criterion,'seg')
+        print('validation loss:',l,'validation dice:',d)
         torch.save(transformer,path+'transformer'+str(epoch)+'.pt')
 
 
@@ -163,7 +204,8 @@ def train_transformer_attention_seg(epochs,current_epoch,path='model_transformer
             loss.backward()
             optimizer.step()
 
-        validation(None,transformer,loader_,criterion,'seg')
+        l,d=validation(None,transformer,loader_,criterion,'seg')
+        print('validation loss:',l,'validation dice:',d)
         torch.save(transformer,path+'transformer'+str(epoch)+'.pt')
 
 
