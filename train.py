@@ -39,8 +39,12 @@ def train_confidence_transformer_axial(epochs,current_epoch,path='model_confiden
     optimizer=torch.optim.Adam(params,lr=0.0001)
     dataloader=NeedleImagePairDataset(split='train',root='../data/needle_insertion_dataset')
     loader=torch.utils.data.DataLoader(dataloader,batch_size=8,shuffle=True,num_workers=1,pin_memory=True,sampler=None,drop_last=True)
+    dataloader_=NeedleImagePairDataset(split='val',root='../data/needle_insertion_dataset')
+    loader_=torch.utils.data.DataLoader(dataloader_,batch_size=1,shuffle=False,num_workers=1,pin_memory=True,sampler=None,drop_last=True)
     for epoch in range(current_epoch+1,epochs):
         for batch,data in enumerate(loader):
+            unet.train()
+            transformer.train()
             previous_frame=data['current_image'].to(device)
             previous_seg=data['current_image_label'].to(device)
             current_frame=data['next_image'].to(device)
@@ -54,10 +58,10 @@ def train_confidence_transformer_axial(epochs,current_epoch,path='model_confiden
             print('epoch',epoch,'batch',batch,loss.item())
             loss.backward()
             optimizer.step()
-
+        validation(unet,transformer,loader_,criterion,'conf')
 
         torch.save(unet,path+'unet'+str(epoch)+'pt')
-        torch.save(transformer,path+'transformer'+str(epoch)+'pt')
+        torch.save(transformer,path+'transformer'+str(epoch)+'.pt')
 
 
 def train_confidence_transformer_attention(epochs,current_epoch,path='model_confidence_transformer_attention/'):
@@ -74,8 +78,12 @@ def train_confidence_transformer_attention(epochs,current_epoch,path='model_conf
     optimizer=torch.optim.Adam(params,lr=0.0001)
     dataloader=NeedleImagePairDataset(split='train',root='../data/needle_insertion_dataset')
     loader=torch.utils.data.DataLoader(dataloader,batch_size=8,shuffle=True,num_workers=1,pin_memory=True,sampler=None,drop_last=True)
+    dataloader_=NeedleImagePairDataset(split='val',root='../data/needle_insertion_dataset')
+    loader_=torch.utils.data.DataLoader(dataloader_,batch_size=1,shuffle=False,num_workers=1,pin_memory=True,sampler=None,drop_last=True)
     for epoch in range(current_epoch+1,epochs):
         for batch,data in enumerate(loader):
+            unet.train()
+            transformer.train()
             previous_frame=data['current_image'].to(device)
             previous_seg=data['current_image_label'].to(device)
             current_frame=data['next_image'].to(device)
@@ -90,7 +98,7 @@ def train_confidence_transformer_attention(epochs,current_epoch,path='model_conf
             loss.backward()
             optimizer.step()
 
-
+        validation(unet,transformer,loader_,criterion,'conf')
         torch.save(unet,path+'unet'+str(epoch)+'pt')
         torch.save(transformer,path+'transformer'+str(epoch)+'pt')
 
@@ -106,8 +114,11 @@ def train_transformer_axial_seg(epochs,current_epoch,path='model_transformer_axi
     optimizer=torch.optim.Adam(params,lr=0.0001)
     dataloader=NeedleImagePairDataset(split='train',root='../data/needle_insertion_dataset')
     loader=torch.utils.data.DataLoader(dataloader,batch_size=8,shuffle=True,num_workers=1,pin_memory=True,sampler=None,drop_last=True)
+    dataloader_=NeedleImagePairDataset(split='val',root='../data/needle_insertion_dataset')
+    loader_=torch.utils.data.DataLoader(dataloader_,batch_size=1,shuffle=False,num_workers=1,pin_memory=True,sampler=None,drop_last=True)
     for epoch in range(current_epoch+1,epochs):
         for batch,data in enumerate(loader):
+            transformer.train()
             previous_frame=data['current_image'].to(device)
             previous_seg=data['current_image_label'].to(device)
             current_frame=data['next_image'].to(device)
@@ -120,8 +131,8 @@ def train_transformer_axial_seg(epochs,current_epoch,path='model_transformer_axi
             loss.backward()
             optimizer.step()
 
-
-        torch.save(transformer,path+'transformer'+str(epoch)+'pt')
+        validation(None,transformer,loader_,criterion,'seg')
+        torch.save(transformer,path+'transformer'+str(epoch)+'.pt')
 
 
 def train_transformer_attention_seg(epochs,current_epoch,path='model_transformer_attention_seg/'):
@@ -135,8 +146,11 @@ def train_transformer_attention_seg(epochs,current_epoch,path='model_transformer
     optimizer=torch.optim.Adam(params,lr=0.0001)
     dataloader=NeedleImagePairDataset(split='train',root='../data/needle_insertion_dataset')
     loader=torch.utils.data.DataLoader(dataloader,batch_size=8,shuffle=True,num_workers=1,pin_memory=True,sampler=None,drop_last=True)
+    dataloader_=NeedleImagePairDataset(split='val',root='../data/needle_insertion_dataset')
+    loader_=torch.utils.data.DataLoader(dataloader_,batch_size=1,shuffle=False,num_workers=1,pin_memory=True,sampler=None,drop_last=True)
     for epoch in range(current_epoch+1,epochs):
         for batch,data in enumerate(loader):
+            transformer.train()
             previous_frame=data['current_image'].to(device)
             previous_seg=data['current_image_label'].to(device)
             current_frame=data['next_image'].to(device)
@@ -149,8 +163,8 @@ def train_transformer_attention_seg(epochs,current_epoch,path='model_transformer
             loss.backward()
             optimizer.step()
 
-
-        torch.save(transformer,path+'transformer'+str(epoch)+'pt')
+        validation(None,transformer,loader_,criterion,'seg')
+        torch.save(transformer,path+'transformer'+str(epoch)+'.pt')
 
 
 def validation(model1,model2,dataloader,criterion,mode):
