@@ -14,14 +14,15 @@ def read_txt(file_name):
             folder_name = line[:-1]
             folders.append(folder_name)
     return folders
+
 ### load a pair of image everytime
 class NeedleImagePairDataset(Dataset):
-
+    
     def __init__(self, split, root, transform=None, label_transform=None):
 
         self.split = split
         self.root = root
-
+        
         if self.split in ['train', 'val', 'test']:
             self.folders = read_txt(os.path.join(self.root, self.split + '.txt'))
 
@@ -51,7 +52,7 @@ class NeedleImagePairDataset(Dataset):
             self.transform = transform
             self.label_transform = label_transform
 
-
+    
     def __len__(self):
         return len(self.image_pairs)
 
@@ -60,7 +61,7 @@ class NeedleImagePairDataset(Dataset):
         image_pair = self.image_pairs[idx]
         folder = image_pair[0]
         if len(image_pair) == 3:
-
+            
             cur_image_name = image_pair[1]
             next_image_name = image_pair[2]
 
@@ -69,17 +70,17 @@ class NeedleImagePairDataset(Dataset):
             cur_image = transforms.Compose(self.transform)(cur_image)
             # print(os.path.join(self.root, next_image_name))
             next_image = Image.open(os.path.join(self.root, folder, 'train_images', next_image_name))
-            next_image = transforms.Compose(self.transform)(next_image)
+            next_image = transforms.Compose(self.transform)(next_image) 
             # load label
             cur_image_label = Image.open(os.path.join(self.root, folder, 'train_labels', cur_image_name))
             cur_image_label = transforms.Compose(self.transform)(cur_image_label)
 
             next_image_label = Image.open(os.path.join(self.root, folder, 'train_labels', next_image_name))
-            next_image_label = transforms.Compose(self.transform)(next_image_label)
+            next_image_label = transforms.Compose(self.transform)(next_image_label)       
             # load cache
             if os.path.exists(os.path.join(self.root, 'cache', folder, cur_image_name)):
                 cache_label = Image.open(os.path.join(self.root, 'cache', folder, cur_image_name))
-                cache_label = transforms.Compose(self.transform)(cache_label)
+                cache_label = transforms.Compose(self.transform)(cache_label)       
             else:
                 cache_label = cur_image_label
             # convert to segmentation map
@@ -88,28 +89,29 @@ class NeedleImagePairDataset(Dataset):
             cur_image_label = cur_image_label[0, :, :]
             next_image_label = next_image_label[0, :, :]
             cache_label = cache_label[0, :, :]
+            flag = 0
         else:
             next_image_name = image_pair[1]
 
             # load image
             next_image = Image.open(os.path.join(self.root, folder, 'train_images', next_image_name))
-            next_image = transforms.Compose(self.transform)(next_image)
+            next_image = transforms.Compose(self.transform)(next_image) 
             # load label
             next_image_label = Image.open(os.path.join(self.root, folder, 'train_labels', next_image_name))
-            next_image_label = transforms.Compose(self.transform)(next_image_label)
+            next_image_label = transforms.Compose(self.transform)(next_image_label)       
 
-            # convert to segmentation map
+            # convert to segmentation map 
             next_image_label = next_image_label[0, :, :]
             next_image=next_image[0:1,:,:]
 
             # all empty
             cur_image = torch.zeros(next_image.size())
-            cur_image_label = torch.zeros(next_image_label.size())
-            cache_label = torch.zeros(next_image_label.size())
+            cur_image_label = torch.zeros(next_image_label.size())           
+            cache_label = torch.zeros(next_image_label.size()) 
+            flag = 1
 
-        #print(os.path.join(self.root, 'cache', folder, next_image_name))
-        return {'current_image':cur_image.float(), 'current_image_label':cur_image_label.unsqueeze(0), 'cache_label':cache_label.unsqueeze(0), 'next_image':next_image.float(), 'next_image_label':next_image_label.unsqueeze(0), 'cache_location': os.path.join(self.root, 'cache', folder, next_image_name)}
-
+        # print(os.path.join(self.root, 'cache', folder, next_image_name))
+        return {'current_image':cur_image.float(), 'current_image_label':cur_image_label.unsqueeze(0), 'cache_label':cache_label.unsqueeze(0), 'next_image':next_image.float(), 'next_image_label':next_image_label.unsqueeze(0), 'cache_location': os.path.join(self.root, 'cache', folder, next_image_name), 'flag':flag}
 
 
 ### load single image
