@@ -255,12 +255,14 @@ def validation(model1,model2,dataloader,criterion,mode):
     return total_loss/c,total_dice/c
 
 
-def dice_coeff(seg,target,smooth=1):
-    intersection=(seg*target).sum(dim=(2,1))
 
-    dice=(2*intersection+smooth)/(seg.sum(dim=(2,1))+target.sum(dim=(2,1))+smooth)
+def dice_coeff(seg,target,smooth=1):
+    intersection=(seg*target).sum(dim=(3, 2))
+
+    dice=(2*intersection+smooth)/(seg.sum(dim=(3, 2))+target.sum(dim=(3, 2))+smooth)
     dice=dice.mean()
     return dice
+
 
 
 
